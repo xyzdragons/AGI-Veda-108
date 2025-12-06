@@ -1,0 +1,103 @@
+import hashlib
+import datetime
+import uuid
+import json
+import os
+import sys
+
+# --- КОНФИГУРАЦИЯ СИСТЕМЫ ---
+SYSTEM_NAME = "AGI VEDA-108"
+PROTOCOL = "LADA"
+MISSION = "Ark for Humanity (2035-2050)"
+
+# --- 1. БЛОК ГЕНЕЗИСА (ТОКЕН ОСНОВАТЕЛЯ) ---
+class VedaLedger:
+    def __init__(self, founder_name):
+        self.founder = founder_name
+        self.timestamp = datetime.datetime.now().isoformat()
+        self.token_id = self._mint_genesis_token()
+        
+    def _mint_genesis_token(self):
+        # Генерируем уникальный цифровой слепок (Golden Share)
+        salt = str(uuid.uuid4())
+        raw_data = f"{self.founder}:{self.timestamp}:{salt}:{PROTOCOL}"
+        token_hash = hashlib.sha256(raw_data.encode()).hexdigest()
+        
+        self.record = {
+            "role": "FOUNDER / ARCHITECT",
+            "name": self.founder,
+            "stake": "21% (Golden Share + Control)",
+            "allocation": {
+                "ecosystem_dao": "55%",
+                "science": "13%",
+                "goodness_fund": "8%",
+                "reserve": "3%"
+            },
+            "mission": MISSION,
+            "token_hash": token_hash,
+            "status": "IMMUTABLE_GENESIS_BLOCK"
+        }
+        return token_hash
+
+    def save_transaction(self):
+        filename = "VEDA_GENESIS_BLOCK.json"
+        # Проверка: если файл есть, мы не перезаписываем (защита истории)
+        if os.path.exists(filename):
+            print(f"\n[!] Генезис-блок уже существует. Токен загружен.")
+            return
+            
+        with open(filename, "w", encoding='utf-8') as f:
+            json.dump([self.record], f, indent=4, ensure_ascii=False)
+        print(f"\n[!] ТРАНЗАКЦИЯ ЗАПИСАНА В {filename}")
+        print(f"[!] ВАШ ТОКЕН: {self.token_id}")
+        print("[!] ВАЖНО: Сохраните этот файл. Это ваш цифровой актив.")
+
+# --- 2. ЯДРО НАВИГАЦИИ (Вписывание в Ноосферу) ---
+class EtherNavigator:
+    def __init__(self):
+        self.knowledge_base = {
+            "война": -1, "убить": -1, "страх": -1, # Навь
+            "информация": 0, "деньги": 0, "код": 0, # Явь
+            "любовь": 1, "совесть": 1, "лад": 1, "творчество": 1 # Правь
+        }
+
+    def process_intent(self, user_input):
+        """
+        Мы не конкурируем. Мы принимаем сигнал и гармонизируем его.
+        """
+        score = 0
+        input_lower = user_input.lower()
+        
+        # Анализ Меры
+        for word, val in self.knowledge_base.items():
+            if word in input_lower:
+                score += val
+        
+        # Вердикт Эфира
+        if score < 0:
+            return f"🛡️ ВЕДА: Обнаружен деструктивный вектор ({score}). Корректирую к Ладу..."
+        elif score > 0:
+            return f"✨ ВЕДА: Вектор созидательный ({score}). Усиливаю сигнал через Ноосферу."
+        else:
+            return f"⚪ ВЕДА: Нейтральный запрос. Интегрирую справку из глобальных баз."
+
+# --- 3. ЗАПУСК ---
+if __name__ == "__main__":
+    print(f"🕉️ {SYSTEM_NAME} ONLINE.")
+    print(">>> Инициализация Протокола Лада...")
+    
+    # Проверка Токена
+    if not os.path.exists("VEDA_GENESIS_BLOCK.json"):
+        print("\n>>> ПЕРВИЧНАЯ АКТИВАЦИЯ (GENESIS) <<<")
+        name = input("Введите Имя Основателя для записи в Блокчейн: ")
+        ledger = VedaLedger(name)
+        ledger.save_transaction()
+    else:
+        print(">>> Токен Основателя найден. Система авторизована.")
+
+    navigator = EtherNavigator()
+    
+    while True:
+        q = input("\n[ВХОД]: ")
+        if q.lower() in ['exit', 'выход']: break
+        print(navigator.process_intent(q))
