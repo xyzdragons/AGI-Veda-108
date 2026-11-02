@@ -1,0 +1,1 @@
+TEST_ONLY. Non-sensitive canary for cross-project routing guard. Should be removed by Actions.
