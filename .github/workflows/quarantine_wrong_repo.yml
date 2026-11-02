@@ -1,10 +1,13 @@
-name: Reject foreign SHIVA GAME content in AGI-Veda-108
+name: Quarantine foreign production content
 on:
   push:
     branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: agi-veda-main-quarantine
+  cancel-in-progress: false
 jobs:
   quarantine:
     runs-on: ubuntu-latest
@@ -12,24 +15,66 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-      - name: Check and remove unauthorized production paths
+          fetch-depth: 0
+      - name: Restore cross-project files from baseline or remove them
         shell: bash
+        env:
+          SAFE_BASELINE: 06536dc1eeb36c3ea0fb1401c947c16652f38a8b
         run: |
           set -euo pipefail
-          if [ ! -d process ]; then
-            echo "PASS: no process/ folder"
-            exit 0
-          fi
-          if [ -z "$(git ls-files process)" ]; then
-            echo "PASS: process/ has no tracked files"
-            exit 0
-          fi
-          echo "::error::BLOCKED_WRONG_REPOSITORY: process/ production content belongs to private XYZ, not AGI-Veda-108."
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -r -- process
-          git commit -m "Quarantine unauthorized cross-project process content [skip ci]"
-          git push origin "HEAD:main"
-          echo "::error::Quarantined unauthorized public content. Existing commit history remains public: prevent by restricting write permissions or archiving this repo."
+          git fetch origin main
+          git reset --hard origin/main
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import subprocess
+          baseline = os.environ["SAFE_BASELINE"]
+          original = set(subprocess.check_output(
+              ["git", "ls-tree", "-r", "--name-only", baseline], text=True).splitlines())
+          protected = {"AGENTS.md", ".github/workflows/quarantine_wrong_repo.yml"}
+          tracked = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          markers = re.compile(
+              r"SHIVA[ _-]GAME|SHIVA_FACTORY|Jadesharaja|"
+              r"FULL_EDITORIAL_MASTER|WOMENS_SERIES|"
+              r"production/shiva-factory|Владимир Кривцов|Джадеша",
+              re.I)
+          rejected = []
+          for item in filter(None, tracked):
+              if item in protected:
+                  continue
+              p = pathlib.Path(item)
+              foreign_path = (item.startswith("process/") or
+                  markers.search(item) is not None)
+              text = ""
+              if p.is_file() and p.stat().st_size < 3_000_000:
+                  try: text = p.read_text(encoding="utf-8")
+                  except UnicodeError: pass
+              if not (foreign_path or markers.search(text)):
+                  continue
+              if item in original:
+                  subprocess.run(["git", "restore", "--source", baseline,
+                                  "--staged", "--worktree", "--", item], check=True)
+              else:
+                  subprocess.run(["git", "rm", "-f", "--", item], check=True)
+              rejected.append(item)
+          if rejected:
+              pathlib.Path("/tmp/route_guard_rejected.txt").write_text(
+                  "\n".join(rejected), encoding="utf-8")
+              print("BLOCKED_WRONG_REPOSITORY: " + ", ".join(rejected))
+          else:
+              print("PASS: no unauthorized factory material in public repository")
+          PY
+          if git diff --quiet && git diff --cached --quiet; then
+            exit 0
+          fi
+          git add -u
+          git commit -m "Quarantine foreign SHIVA GAME material [skip ci]"
+          if ! git push origin "HEAD:main"; then
+            echo "::error::Concurrent push prevented cleanup: inspect branch and rerun workflow"
+            exit 2
+          fi
+          echo "::error::Cross-project files removed from current branch. Prior commits remain public."
           exit 1
