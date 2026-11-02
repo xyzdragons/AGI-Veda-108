@@ -1,1 +1,0 @@
-ROUTING_CANARY_ONLY. No user data. Must be removed automatically by quarantine_wrong_repo.yml.
